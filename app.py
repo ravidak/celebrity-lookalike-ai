@@ -1,22 +1,25 @@
-# app.py — FINAL STREAMLIT CLOUD SAFE DEMO
+# app.py — FINAL WORKING DEMO (NO PKL REQUIRED)
 
-import pickle
-import numpy as np
 import streamlit as st
 from PIL import Image
+import os
+import random
 
 st.set_page_config(page_title="Celebrity Look-Alike AI", page_icon="🎭")
 st.title("🎭 Celebrity Look-Alike AI (Demo)")
 
-@st.cache_resource
-def load_data():
-    with open("embedding.pkl", "rb") as f:
-        features = pickle.load(f)
-    with open("filenames.pkl", "rb") as f:
-        filenames = pickle.load(f)
-    return np.array(features), filenames
+DATA_DIR = "data"  # folder containing celebrity images
 
-features, filenames = load_data()
+# Load celebrity images
+def load_images():
+    images = []
+    for root, dirs, files in os.walk(DATA_DIR):
+        for file in files:
+            if file.lower().endswith(("jpg", "jpeg", "png")):
+                images.append(os.path.join(root, file))
+    return images
+
+celebrity_images = load_images()
 
 uploaded = st.file_uploader(
     "Upload your image (demo mode)",
@@ -26,12 +29,14 @@ uploaded = st.file_uploader(
 if uploaded:
     st.image(uploaded, caption="Uploaded Image")
 
-    st.info("ℹ️ Demo version using precomputed embeddings")
+    st.info("ℹ️ Demo version (no ML inference on cloud)")
 
-    index = np.random.randint(0, len(filenames))
-
-    st.success("🎉 You look like:")
-    st.image(filenames[index], width=300)
+    if celebrity_images:
+        choice = random.choice(celebrity_images)
+        st.success("🎉 You look like:")
+        st.image(choice, width=300)
+    else:
+        st.error("No celebrity images found in data folder")
 
 else:
-    st.info("👆 Upload an image to get a celebrity look-alike")
+    st.info("👆 Upload an image to see a celebrity look-alike")
