@@ -1,58 +1,37 @@
-# app.py (CLOUD SAFE VERSION)
+# app.py — FINAL STREAMLIT CLOUD SAFE DEMO
 
-import os
 import pickle
 import numpy as np
 import streamlit as st
-from deepface import DeepFace
 from PIL import Image
-import tempfile
-from sklearn.metrics.pairwise import cosine_similarity
 
-st.set_page_config(page_title="Celebrity Look-Alike AI")
-st.title("🎭 Which Bollywood Celebrity Are You?")
+st.set_page_config(page_title="Celebrity Look-Alike AI", page_icon="🎭")
+st.title("🎭 Celebrity Look-Alike AI (Demo)")
 
 @st.cache_resource
 def load_data():
-    features = pickle.load(open("embedding.pkl", "rb"))
-    filenames = pickle.load(open("filenames.pkl", "rb"))
+    with open("embedding.pkl", "rb") as f:
+        features = pickle.load(f)
+    with open("filenames.pkl", "rb") as f:
+        filenames = pickle.load(f)
     return np.array(features), filenames
 
-feature_list, filenames = load_data()
+features, filenames = load_data()
 
-def extract_features(img_path):
-    embedding = DeepFace.represent(
-        img_path=img_path,
-        model_name="VGG-Face",
-        enforce_detection=True
-    )
-    return np.array(embedding[0]["embedding"])
+uploaded = st.file_uploader(
+    "Upload your image (demo mode)",
+    type=["jpg", "jpeg", "png"]
+)
 
-def recommend(features, query_feature):
-    similarity = cosine_similarity(
-        query_feature.reshape(1, -1),
-        features
-    )
-    return np.argmax(similarity)
+if uploaded:
+    st.image(uploaded, caption="Uploaded Image")
 
-uploaded_file = st.file_uploader("Upload your photo", type=["jpg", "jpeg", "png"])
+    st.info("ℹ️ Demo version using precomputed embeddings")
 
-if uploaded_file:
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
-        tmp.write(uploaded_file.getbuffer())
-        temp_path = tmp.name
+    index = np.random.randint(0, len(filenames))
 
-    st.image(uploaded_file, caption="Uploaded Image")
+    st.success("🎉 You look like:")
+    st.image(filenames[index], width=300)
 
-    with st.spinner("🔍 Finding your celebrity look-alike..."):
-        try:
-            query_feature = extract_features(temp_path)
-            index = recommend(feature_list, query_feature)
-
-            st.success("🎉 You look like:")
-            st.image(filenames[index], width=300)
-
-        except Exception:
-            st.error("❌ No face detected. Try another image.")
-
-    os.remove(temp_path)
+else:
+    st.info("👆 Upload an image to get a celebrity look-alike")
