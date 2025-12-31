@@ -1,99 +1,58 @@
-# app.py
+# app.py (CLOUD SAFE VERSION)
 
 import os
 import pickle
 import numpy as np
-from PIL import Image
 import streamlit as st
-from sklearn.metrics.pairwise import cosine_similarity
-from mtcnn import MTCNN
 from deepface import DeepFace
-try:
-    import cv2
-except ImportError:
-    cv2 = None
+from PIL import Image
+import tempfile
+from sklearn.metrics.pairwise import cosine_similarity
 
+st.set_page_config(page_title="Celebrity Look-Alike AI")
+st.title("🎭 Which Bollywood Celebrity Are You?")
 
-# -------------------------------
-# Streamlit basic UI FIRST
-# -------------------------------
-st.set_page_config(page_title="Celebrity Predictor")
-st.title("Which Bollywood Celebrity Are You?")
-
-st.write("⏳ App is loading models... please wait")
-
-# -------------------------------
-# Cache heavy resources
-# -------------------------------
 @st.cache_resource
-def load_resources():
-    detector = MTCNN()
-    feature_list = pickle.load(open("embedding.pkl", "rb"))
+def load_data():
+    features = pickle.load(open("embedding.pkl", "rb"))
     filenames = pickle.load(open("filenames.pkl", "rb"))
-    return detector, feature_list, filenames
+    return np.array(features), filenames
 
-detector, feature_list, filenames = load_resources()
-
-# -------------------------------
-# Helper functions
-# -------------------------------
-def save_uploaded_image(uploaded_image):
-    if not os.path.exists("uploads"):
-        os.makedirs("uploads")
-
-    with open(os.path.join("uploads", uploaded_image.name), "wb") as f:
-        f.write(uploaded_image.getbuffer())
-    return True
-
+feature_list, filenames = load_data()
 
 def extract_features(img_path):
-    img = cv2.imread(img_path)
-    results = detector.detect_faces(img)
-
-    if len(results) == 0:
-        return None
-
-    x, y, width, height = results[0]["box"]
-    face = img[y:y + height, x:x + width]
-
     embedding = DeepFace.represent(
-        img_path=face,
+        img_path=img_path,
         model_name="VGG-Face",
-        detector_backend="mtcnn",
-        enforce_detection=False
+        enforce_detection=True
     )
-
     return np.array(embedding[0]["embedding"])
 
-
-def recommend(feature_list, features):
+def recommend(features, query_feature):
     similarity = cosine_similarity(
-        features.reshape(1, -1),
-        np.array(feature_list)
+        query_feature.reshape(1, -1),
+        features
     )
     return np.argmax(similarity)
 
-# -------------------------------
-# UI logic
-# -------------------------------
-uploaded_image = st.file_uploader("Upload your image")
+uploaded_file = st.file_uploader("Upload your photo", type=["jpg", "jpeg", "png"])
 
-if uploaded_image is not None:
-    save_uploaded_image(uploaded_image)
+if uploaded_file:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
+        tmp.write(uploaded_file.getbuffer())
+        temp_path = tmp.name
 
-    display_image = Image.open(uploaded_image)
-    st.image(display_image, caption="Uploaded Image")
+    st.image(uploaded_file, caption="Uploaded Image")
 
     with st.spinner("🔍 Finding your celebrity look-alike..."):
-        features = extract_features(os.path.join("uploads", uploaded_image.name))
+        try:
+            query_feature = extract_features(temp_path)
+            index = recommend(feature_list, query_feature)
 
-        if features is not None:
-            index_pos = recommend(feature_list, features)
-            predicted_actor = " ".join(
-                filenames[index_pos].split("\\")[1].split("_")
-            )
+            st.success("🎉 You look like:")
+            st.image(filenames[index], width=300)
 
-            st.success("🎉 Seems like: " + predicted_actor)
-            st.image(filenames[index_pos], width=300)
-        else:
-            st.error("❌ No face detected")
+        except Exception:
+            st.error("❌ No face detected. Try another image.")
+
+    os.remove(temp_path)
