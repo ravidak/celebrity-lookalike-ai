@@ -3,12 +3,16 @@
 import os
 import pickle
 import numpy as np
-import cv2
 from PIL import Image
 import streamlit as st
 from sklearn.metrics.pairwise import cosine_similarity
 from mtcnn import MTCNN
 from deepface import DeepFace
+try:
+    import cv2
+except ImportError:
+    cv2 = None
+
 
 # -------------------------------
 # Streamlit basic UI FIRST
